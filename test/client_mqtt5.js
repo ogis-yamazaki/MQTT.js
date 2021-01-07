@@ -533,4 +533,103 @@ describe('MQTT 5.0', function () {
       client.subscribe('a/b', {qos: 1})
     })
   })
+
+  it('should resend in-flight publish messages if sessionPresent is true', function (done) {
+    var clientDisconnected = false
+    var server326 = new MqttServer()
+
+    server326.listen(ports.PORTAND326, function () {
+      var opts = {
+        host: 'localhost',
+        port: ports.PORTAND326,
+        reconnectPeriod: 200,
+        protocolVersion: 5,
+        properties: {
+          sessionExpiryInterval: 10
+        }
+      }
+      var client = mqtt.connect(opts)
+      client.once('connect', function () {
+        client.publish('hello', 'world', { qos: 2 }, function () {
+          assert.isTrue(clientDisconnected, 'validate client is disconnected once')
+          server326.close()
+          client.end(true, done)
+        })
+      })
+      server326.on('client', function (serverClient) {
+        serverClient.on('connect', function (packet) {
+          serverClient.connack({
+            reasonCode: 0,
+            sessionPresent: true
+          })
+
+          serverClient.on('publish', function (packet) {
+            serverClient.pubrec(packet)
+            setImmediate(function () {
+              serverClient.stream.destroy()
+              clientDisconnected = true
+            })
+          })
+
+          serverClient.once('pubrel', function (packet) {
+            setImmediate(function () {
+              serverClient.pubcomp(packet)
+            })
+          })
+        })
+      })
+    })
+  })
+
+  it('should not resend in-flight publish messages if sessionPresent is false', function (done) {
+    var clientDisconnected = false
+    var server327 = new MqttServer()
+
+    server327.listen(ports.PORTAND327, function () {
+      var opts = {
+        host: 'localhost',
+        port: ports.PORTAND327,
+        keepalive: 3,
+        reconnectPeriod: 200,
+        protocolVersion: 5,
+        properties: {
+          sessionExpiryInterval: 10
+        }
+      }
+      var client = mqtt.connect(opts)
+      client.once('connect', function () {
+        client.publish('hello', 'world', { qos: 2 })
+      })
+
+      server327.on('client', function (serverClient) {
+        serverClient.on('connect', function (packet) {
+          serverClient.connack({
+            reasonCode: 0,
+            sessionPresent: false
+          })
+
+          serverClient.on('pingreq', function () {
+            assert.isTrue(clientDisconnected, 'validate client is disconnected once')
+            server327.close()
+            client.end(true, done)
+          })
+
+          serverClient.on('publish', function (packet) {
+            serverClient.pubrec(packet)
+            setImmediate(function () {
+              serverClient.stream.destroy()
+              clientDisconnected = true
+            })
+          })
+
+          serverClient.on('pubrel', function (packet) {
+            setImmediate(function () {
+              server327.close()
+              client.end(true, done(new Error('pubrel should not sent')))
+            })
+          })
+        })
+      })
+    })
+  })
 })
