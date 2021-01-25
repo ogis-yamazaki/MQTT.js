@@ -42,5 +42,10 @@ declare class Store {
    * Close the store
    */
   public close (cb: Function): void
+
+  /**
+   * Clear the store
+   */
+  public clear (cb: Function): this
 }
 export { Store }
