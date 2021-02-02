@@ -391,6 +391,8 @@ describe('MqttClient', function () {
       client = mqtt.connect({
         port: ports.PORTAND47,
         host: 'localhost',
+        clean: false,
+        clientId: 'cid1',
         connectTimeout: 350,
         reconnectPeriod: 300
       })
@@ -402,7 +404,7 @@ describe('MqttClient', function () {
           if (packet.clientId === 'invalid') {
             serverClient.connack({returnCode: 2})
           } else {
-            serverClient.connack({returnCode: 0})
+            serverClient.connack({returnCode: 0, sessionPresent: true})
           }
         })
 

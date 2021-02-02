@@ -601,6 +601,7 @@ module.exports = function (server, config) {
       var server2 = serverBuilder(config.protocol, function (serverClient) {
         serverClient.on('connect', function () {
           var connack = version === 5 ? { reasonCode: 0 } : { returnCode: 0 }
+          connack['sessionPresent'] = true
           serverClient.connack(connack)
         })
         serverClient.on('publish', function (packet) {
@@ -1300,6 +1301,7 @@ module.exports = function (server, config) {
 
         serverClient.on('connect', function (packet) {
           var connack = version === 5 ? { reasonCode: 0 } : { returnCode: 0 }
+          connack['sessionPresent'] = true
           serverClient.connack(connack)
         })
         serverClient.on('publish', function (packet) {
@@ -2438,35 +2440,57 @@ module.exports = function (server, config) {
     })
 
     it('should resend in-flight QoS 1 publish messages from the client', function (done) {
-      var client = connect({reconnectPeriod: 200})
       var serverPublished = false
       var clientCalledBack = false
 
-      server.once('client', function (serverClient) {
-        serverClient.on('connect', function () {
+      var server2 = serverBuilder(config.protocol, function (serverClient) {
+        serverClient.on('connect', function (packet) {
+          var connack = version === 5 ? { reasonCode: 0 } : { returnCode: 0 }
+          connack['sessionPresent'] = true
+          serverClient.connack(connack)
+        })
+        serverClient.on('publish', function (packet) {
           setImmediate(function () {
-            serverClient.stream.destroy()
-          })
-        })
-
-        server.once('client', function (serverClientNew) {
-          serverClientNew.on('publish', function () {
-            serverPublished = true
-            check()
+            serverClient.puback(packet)
           })
         })
       })
 
-      client.publish('hello', 'world', { qos: 1 }, function () {
-        clientCalledBack = true
-        check()
-      })
+      server2.listen(ports.PORTAND50, function () {
+        var opt = {
+          clientId: 'cid1',
+          clean: false,
+          port: ports.PORTAND50,
+          reconnectPeriod: 200 }
+        var client = connect(opt)
 
-      function check () {
-        if (serverPublished && clientCalledBack) {
-          client.end(true, done)
+        server2.once('client', function (serverClient) {
+          serverClient.on('connect', function () {
+            setImmediate(function () {
+              serverClient.stream.destroy()
+            })
+          })
+
+          server2.once('client', function (serverClientNew) {
+            serverClientNew.on('publish', function () {
+              serverPublished = true
+              check()
+            })
+          })
+        })
+
+        client.publish('hello', 'world', { qos: 1 }, function () {
+          clientCalledBack = true
+          check()
+        })
+
+        function check () {
+          if (serverPublished && clientCalledBack) {
+            server2.close()
+            client.end(true, done)
+          }
         }
-      }
+      })
     })
 
     it('should not resend in-flight publish messages if disconnecting', function (done) {
@@ -2496,37 +2520,62 @@ module.exports = function (server, config) {
     })
 
     it('should resend in-flight QoS 2 publish messages from the client', function (done) {
-      var client = connect({reconnectPeriod: 200})
       var serverPublished = false
       var clientCalledBack = false
 
-      server.once('client', function (serverClient) {
-        // ignore errors
-        serverClient.on('error', function () {})
-        serverClient.on('publish', function () {
+      var server2 = serverBuilder(config.protocol, function (serverClient) {
+        serverClient.on('connect', function (packet) {
+          var connack = version === 5 ? { reasonCode: 0 } : { returnCode: 0 }
+          connack['sessionPresent'] = true
+          serverClient.connack(connack)
+        })
+        serverClient.on('publish', function (packet) {
           setImmediate(function () {
-            serverClient.stream.destroy()
+            serverClient.pubrec(packet)
           })
         })
-
-        server.once('client', function (serverClientNew) {
-          serverClientNew.on('pubrel', function () {
-            serverPublished = true
-            check()
-          })
+        serverClient.on('pubrel', function (packet) {
+          serverClient.pubcomp(packet)
         })
       })
 
-      client.publish('hello', 'world', { qos: 2 }, function () {
-        clientCalledBack = true
-        check()
-      })
+      server2.listen(ports.PORTAND50, function () {
+        var opt = {
+          clientId: 'cid1',
+          clean: false,
+          port: ports.PORTAND50,
+          reconnectPeriod: 200 }
+        var client = connect(opt)
 
-      function check () {
-        if (serverPublished && clientCalledBack) {
-          client.end(true, done)
+        server2.once('client', function (serverClient) {
+          // ignore errors
+          serverClient.on('error', function () {})
+          serverClient.on('publish', function () {
+            setImmediate(function () {
+              serverClient.stream.destroy()
+            })
+          })
+
+          server2.once('client', function (serverClientNew) {
+            serverClientNew.on('pubrel', function () {
+              serverPublished = true
+              check()
+            })
+          })
+        })
+
+        client.publish('hello', 'world', { qos: 2 }, function () {
+          clientCalledBack = true
+          check()
+        })
+
+        function check () {
+          if (serverPublished && clientCalledBack) {
+            server2.close()
+            client.end(true, done)
+          }
         }
-      }
+      })
     })
 
     it('should not resend in-flight QoS 1 removed publish messages from the client', function (done) {
@@ -2830,6 +2879,7 @@ module.exports = function (server, config) {
       var server2 = serverBuilder(config.protocol, function (serverClient) {
         serverClient.on('connect', function (packet) {
           var connack = version === 5 ? { reasonCode: 0 } : { returnCode: 0 }
+          connack['sessionPresent'] = true
           serverClient.connack(connack)
         })
         serverClient.on('publish', function (packet) {
@@ -2876,6 +2926,7 @@ module.exports = function (server, config) {
       var server2 = serverBuilder(config.protocol, function (serverClient) {
         serverClient.on('connect', function (packet) {
           var connack = version === 5 ? { reasonCode: 0 } : { returnCode: 0 }
+          connack['sessionPresent'] = true
           serverClient.connack(connack)
         })
         serverClient.on('publish', function (packet) {
@@ -2922,6 +2973,7 @@ module.exports = function (server, config) {
       var server2 = serverBuilder(config.protocol, function (serverClient) {
         serverClient.on('connect', function (packet) {
           var connack = version === 5 ? { reasonCode: 0 } : { returnCode: 0 }
+          connack['sessionPresent'] = true
           serverClient.connack(connack)
         })
         serverClient.on('publish', function (packet) {
@@ -2979,6 +3031,7 @@ module.exports = function (server, config) {
 
         serverClient.on('connect', function (packet) {
           var connack = version === 5 ? { reasonCode: 0 } : { returnCode: 0 }
+          connack['sessionPresent'] = true
           serverClient.connack(connack)
         })
         serverClient.on('publish', function (packet) {
