@@ -25,3 +25,5 @@ export {
   IDisconnectPacket,
   Packet
 } from 'mqtt-packet'
+export { IMessageIdProvider } from './lib/message-id-provider'
+export { UniqueMessageIdProvider } from './lib/unique-message-id-provider'
