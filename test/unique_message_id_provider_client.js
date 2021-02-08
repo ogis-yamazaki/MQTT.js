@@ -6,7 +6,7 @@ var UniqueMessageIdProvider = require('../lib/unique-message-id-provider')
 var ports = require('./helpers/port_list')
 
 describe('UniqueMessageIdProviderMqttClient', function () {
-  var server = serverBuilder()
+  var server = serverBuilder('mqtt')
   var config = {protocol: 'mqtt', port: ports.PORTAND400, messageIdProvider: new UniqueMessageIdProvider()}
   server.listen(ports.PORTAND400)
 
