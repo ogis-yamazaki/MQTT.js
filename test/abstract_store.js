@@ -132,4 +132,29 @@ module.exports = function abstractStoreTest (build) {
       })
     })
   })
+
+  it('should clear in-flight packets', function (done) {
+    var packet1 = {
+      topic: 'hello',
+      payload: 'world',
+      qos: 1,
+      messageId: 42
+    }
+    var packet2 = {
+      cmd: 'pubrel',
+      qos: 2,
+      messageId: 43
+    }
+    store.put(packet1, function () {
+      store.put(packet2, function () {
+        store
+          .clear()
+          .createStream()
+          .on('data', function () {
+            done(new Error('this should never happen'))
+          })
+          .on('end', done)
+      })
+    })
+  })
 }
